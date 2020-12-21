@@ -9,7 +9,7 @@ import (
 
 	. "gopkg.in/check.v1"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 type nameStruct struct {
@@ -271,4 +271,17 @@ func (t *MsgpackTest) TestMapStringInterface(c *C) {
 	c.Assert(out["foo"], Equals, "bar")
 	mm := out["hello"].(map[string]interface{})
 	c.Assert(mm["foo"], Equals, "bar")
+}
+
+//------------------------------------------------------------------------------
+
+func TestNoPanicOnUnsupportKey(t *testing.T) {
+	data := []byte{0x81, 0x81, 0xa1, 0x78, 0xc3, 0xc3}
+
+	var msg interface{}
+	err := msgpack.Unmarshal(data, &msg)
+
+	if err == nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 }

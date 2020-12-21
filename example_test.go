@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 func ExampleMarshal() {
@@ -117,7 +117,7 @@ func ExampleDecoder_Query() {
 	// 2nd phone is 54321
 }
 
-func ExampleEncoder_StructAsArray() {
+func ExampleEncoder_UseArrayForStructs() {
 	type Item struct {
 		Foo string
 		Bar string

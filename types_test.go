@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vmihailenco/msgpack"
-	"github.com/vmihailenco/msgpack/codes"
+	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack/v4/codes"
 )
 
 //------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ var _ msgpack.CustomDecoder = (*IntSet)(nil)
 
 func (set IntSet) EncodeMsgpack(enc *msgpack.Encoder) error {
 	slice := make([]int, 0, len(set))
-	for n, _ := range set {
+	for n := range set {
 		slice = append(slice, n)
 	}
 	return enc.Encode(slice)
@@ -228,13 +228,57 @@ var encoderTests = []encoderTest{
 
 func TestEncoder(t *testing.T) {
 	var buf bytes.Buffer
-	enc := msgpack.NewEncoder(&buf).
-		UseJSONTag(true).
-		SortMapKeys(true).
-		UseCompactEncoding(true)
+	enc := msgpack.NewEncoder(&buf)
+	enc.UseJSONTag(true)
+	enc.SortMapKeys(true)
+	enc.UseCompactEncoding(true)
 
 	for _, test := range encoderTests {
 		buf.Reset()
+
+		err := enc.Encode(test.in)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s := hex.EncodeToString(buf.Bytes())
+		if s != test.wanted {
+			t.Fatalf("%s != %s (in=%#v)", s, test.wanted, test.in)
+		}
+	}
+}
+
+type floatEncoderTest struct {
+	in      interface{}
+	wanted  string
+	compact bool
+}
+
+var floatEncoderTests = []floatEncoderTest{
+	{float32(3.0), "ca40400000", false},
+	{float32(3.0), "03", true},
+
+	{float64(3.0), "cb4008000000000000", false},
+	{float64(3.0), "03", true},
+
+	{float64(-3.0), "cbc008000000000000", false},
+	{float64(-3.0), "fd", true},
+
+	{math.NaN(), "cb7ff8000000000001", false},
+	{math.NaN(), "cb7ff8000000000001", true},
+	{math.Inf(1), "cb7ff0000000000000", false},
+	{math.Inf(1), "cb7ff0000000000000", true},
+}
+
+func TestFloatEncoding(t *testing.T) {
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	enc.UseCompactEncoding(true)
+
+	for _, test := range floatEncoderTests {
+		buf.Reset()
+
+		enc.UseCompactFloats(test.compact)
 
 		err := enc.Encode(test.in)
 		if err != nil {
@@ -440,6 +484,11 @@ var (
 			out:    new(EmbeddingPtrTest),
 			wanted: EmbeddingPtrTest{Exported: new(Exported)},
 		},
+		{
+			in:     EmbeddingPtrTest{},
+			out:    new(EmbeddingPtrTest),
+			wanted: EmbeddingPtrTest{Exported: new(Exported)},
+		},
 		{in: EmbeddingTest{}, out: new(*EmbeddingTest)},
 		{
 			in: EmbeddingTest{
@@ -450,6 +499,7 @@ var (
 		},
 
 		{in: time.Unix(0, 0), out: new(time.Time)},
+		{in: new(time.Time), out: new(time.Time)},
 		{in: time.Unix(0, 1), out: new(time.Time)},
 		{in: time.Unix(1, 0), out: new(time.Time)},
 		{in: time.Unix(1, 1), out: new(time.Time)},
@@ -505,7 +555,7 @@ var (
 			in:  &InlinePtrTest{OmitEmptyTest: &OmitEmptyTest{Bar: "world"}},
 			out: new(InlinePtrTest),
 		}, {
-			in:  InlineDupTest{FooTest{"foo"}, FooDupTest{"foo dup"}},
+			in:  InlineDupTest{FooTest{"foo"}, FooDupTest{"foo"}},
 			out: new(InlineDupTest),
 		},
 	}
@@ -589,13 +639,13 @@ func TestTypes(t *testing.T) {
 		var dst interface{}
 		err = msgpack.Unmarshal(b, &dst)
 		if err != nil {
-			t.Fatalf("Decode failed: %s (%s)", err, test)
+			t.Fatalf("Unmarshal into interface{} failed: %s (%s)", err, test)
 		}
 
 		dec := msgpack.NewDecoder(bytes.NewReader(b))
 		_, err = dec.DecodeInterface()
 		if err != nil {
-			t.Fatalf("Decode failed: %s (%s)", err, test)
+			t.Fatalf("DecodeInterface failed: %s (%s)", err, test)
 		}
 	}
 }
